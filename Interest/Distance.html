@@ -101,11 +101,11 @@ button:hover{opacity:.93}
 
 <label>Unit</label>
 <select id="unit">
-  <option>mm</option>
-  <option>cm</option>
-  <option selected>m</option>
-  <option>km</option>
-  <option>mi</option>
+  <option value="mm">mm</option>
+  <option value="cm">cm</option>
+  <option value="m" selected>m</option>
+  <option value="km">km</option>
+  <option value="mi">mi</option>
 </select>
 
 <div class="form-grid" id="inputs"></div>
@@ -137,7 +137,7 @@ function updateFields(){
   const t = type.value;
   inputs.innerHTML="";
 
-  if(t==="2d"||t==="manhattan"||t==="chebyshev"){
+  if(["2d","manhattan","chebyshev"].includes(t)){
     inputs.innerHTML =
       field("x₁","x1")+field("y₁","y1")+
       field("x₂","x2")+field("y₂","y2");
@@ -164,9 +164,19 @@ function val(id){
 
 function rad(d){return d*Math.PI/180;}
 
+function convert(meters, unit){
+  switch(unit){
+    case "mm": return meters * 1000;
+    case "cm": return meters * 100;
+    case "km": return meters / 1000;
+    case "mi": return meters / 1609.344;
+    default: return meters;
+  }
+}
+
 function calculate(){
   error.innerText="";
-  let d=0,f="";
+  let meters=0, f="";
 
   try{
     switch(type.value){
@@ -174,7 +184,7 @@ function calculate(){
       case"2d":{
         let x1=val("x1"),y1=val("y1"),x2=val("x2"),y2=val("y2");
         if([x1,y1,x2,y2].includes(null)) throw "";
-        d=Math.hypot(x2-x1,y2-y1);
+        meters=Math.hypot(x2-x1,y2-y1);
         f="√[(x₂−x₁)²+(y₂−y₁)²]";
         break;
       }
@@ -183,7 +193,7 @@ function calculate(){
         let x1=val("x1"),y1=val("y1"),z1=val("z1"),
             x2=val("x2"),y2=val("y2"),z2=val("z2");
         if([x1,y1,z1,x2,y2,z2].includes(null)) throw "";
-        d=Math.hypot(x2-x1,y2-y1,z2-z1);
+        meters=Math.hypot(x2-x1,y2-y1,z2-z1);
         f="√[(x₂−x₁)²+(y₂−y₁)²+(z₂−z₁)²]";
         break;
       }
@@ -191,7 +201,7 @@ function calculate(){
       case"manhattan":{
         let x1=val("x1"),y1=val("y1"),x2=val("x2"),y2=val("y2");
         if([x1,y1,x2,y2].includes(null)) throw "";
-        d=Math.abs(x2-x1)+Math.abs(y2-y1);
+        meters=Math.abs(x2-x1)+Math.abs(y2-y1);
         f="|x₂−x₁| + |y₂−y₁|";
         break;
       }
@@ -199,7 +209,7 @@ function calculate(){
       case"chebyshev":{
         let x1=val("x1"),y1=val("y1"),x2=val("x2"),y2=val("y2");
         if([x1,y1,x2,y2].includes(null)) throw "";
-        d=Math.max(Math.abs(x2-x1),Math.abs(y2-y1));
+        meters=Math.max(Math.abs(x2-x1),Math.abs(y2-y1));
         f="max(|x₂−x₁|, |y₂−y₁|)";
         break;
       }
@@ -208,18 +218,19 @@ function calculate(){
         let lat1=val("lat1"),lon1=val("lon1"),
             lat2=val("lat2"),lon2=val("lon2");
         if([lat1,lon1,lat2,lon2].includes(null)) throw "";
-        const R=6371;
+        const R=6371000;
         const dLat=rad(lat2-lat1);
         const dLon=rad(lon2-lon1);
         const a=Math.sin(dLat/2)**2+
           Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLon/2)**2;
-        d=2*R*Math.asin(Math.sqrt(a));
+        meters=2*R*Math.asin(Math.sqrt(a));
         f="Haversine Formula (Earth radius = 6371 km)";
         break;
       }
     }
 
-    output.innerText=`Distance = ${d.toFixed(6)} ${unit.value}`;
+    const result = convert(meters, unit.value);
+    output.innerText=`Distance = ${result.toFixed(6)} ${unit.value}`;
     formulaBox.innerHTML=`<b>Formula Used</b><br><br>${f}`;
 
   }catch{
