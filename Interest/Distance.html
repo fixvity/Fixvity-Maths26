@@ -13,40 +13,30 @@
   --radius:14px;
 }
 *{box-sizing:border-box}
-
 body{
   margin:0;
   font-family:Inter,system-ui,Arial;
   background:var(--bg);
 }
-
 .container{
   max-width:1150px;
   margin:auto;
   padding:24px;
 }
-
 .card{
   background:var(--card);
   border-radius:var(--radius);
   padding:30px;
   box-shadow:0 12px 32px rgba(0,0,0,.08);
 }
-
-h1{
-  margin:0 0 6px;
-  color:var(--primary);
-}
-
+h1{margin:0;color:var(--primary)}
 small{color:#555}
-
 label{
-  font-weight:600;
   display:block;
   margin-top:16px;
+  font-weight:600;
 }
-
-input, select{
+input,select{
   width:100%;
   padding:14px;
   margin-top:6px;
@@ -54,7 +44,6 @@ input, select{
   border:1px solid #ddd;
   font-size:16px;
 }
-
 button{
   width:100%;
   margin-top:26px;
@@ -66,31 +55,26 @@ button{
   border-radius:12px;
   cursor:pointer;
 }
-button:hover{opacity:.92}
-
+button:hover{opacity:.93}
 .form-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
   gap:20px;
 }
-
 .grid{
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
   gap:26px;
   margin-top:32px;
 }
-
 .result{
   font-size:20px;
   font-weight:700;
 }
-
 .formula{
   font-size:16px;
   color:#444;
 }
-
 .error{
   color:#dc2626;
   font-weight:600;
@@ -110,20 +94,18 @@ button:hover{opacity:.92}
 <select id="type" onchange="updateFields()">
   <option value="2d">2D Coordinate Distance</option>
   <option value="3d">3D Coordinate Distance</option>
-  <option value="speed">Speed × Time</option>
-  <option value="haversine">Earth Distance (GPS)</option>
   <option value="manhattan">Manhattan Distance</option>
   <option value="chebyshev">Chebyshev Distance</option>
+  <option value="gps">Earth Distance (GPS)</option>
 </select>
 
 <label>Unit</label>
 <select id="unit">
   <option>mm</option>
+  <option>cm</option>
   <option selected>m</option>
   <option>km</option>
-  <option>cm</option>
-  <option>mile</option>
-  <option>ft</option>
+  <option>mi</option>
 </select>
 
 <div class="form-grid" id="inputs"></div>
@@ -137,16 +119,15 @@ button:hover{opacity:.92}
     <div class="result" id="output">Distance = —</div>
   </div>
   <div class="card">
-    <div class="formula" id="formulaBox">
-      <b>Formula Used</b><br><br>—
-    </div>
+    <div class="formula" id="formulaBox"><b>Formula Used</b><br><br>—</div>
   </div>
 </div>
 
 </div>
 
 <script>
-const inputsDiv = document.getElementById("inputs");
+const inputs = document.getElementById("inputs");
+const error = document.getElementById("error");
 
 function field(label,id){
   return `<div><label>${label}</label><input type="number" id="${id}" step="any"></div>`;
@@ -154,89 +135,96 @@ function field(label,id){
 
 function updateFields(){
   const t = type.value;
-  inputsDiv.innerHTML="";
+  inputs.innerHTML="";
 
-  if(t==="2d")
-    inputsDiv.innerHTML = field("x₁","x1")+field("y₁","y1")+field("x₂","x2")+field("y₂","y2");
+  if(t==="2d"||t==="manhattan"||t==="chebyshev"){
+    inputs.innerHTML =
+      field("x₁","x1")+field("y₁","y1")+
+      field("x₂","x2")+field("y₂","y2");
+  }
 
-  if(t==="3d")
-    inputsDiv.innerHTML = field("x₁","x1")+field("y₁","y1")+field("z₁","z1")+field("x₂","x2")+field("y₂","y2")+field("z₂","z2");
+  if(t==="3d"){
+    inputs.innerHTML =
+      field("x₁","x1")+field("y₁","y1")+field("z₁","z1")+
+      field("x₂","x2")+field("y₂","y2")+field("z₂","z2");
+  }
 
-  if(t==="speed")
-    inputsDiv.innerHTML = field("Speed","v")+field("Time","t");
-
-  if(t==="haversine")
-    inputsDiv.innerHTML = field("Latitude 1","lat1")+field("Longitude 1","lon1")+field("Latitude 2","lat2")+field("Longitude 2","lon2");
-
-  if(t==="manhattan" || t==="chebyshev")
-    inputsDiv.innerHTML = field("x₁","x1")+field("y₁","y1")+field("x₂","x2")+field("y₂","y2");
+  if(t==="gps"){
+    inputs.innerHTML =
+      field("Latitude 1 (°)","lat1")+field("Longitude 1 (°)","lon1")+
+      field("Latitude 2 (°)","lat2")+field("Longitude 2 (°)","lon2");
+  }
 }
 updateFields();
 
 function val(id){
-  const n=parseFloat(document.getElementById(id)?.value);
-  return isNaN(n)?null:n;
+  const v=parseFloat(document.getElementById(id)?.value);
+  return isNaN(v)?null:v;
 }
+
+function rad(d){return d*Math.PI/180;}
 
 function calculate(){
   error.innerText="";
-  let D=0,f="";
+  let d=0,f="";
 
-  switch(type.value){
-    case"2d":{
-      let x1=val("x1"),y1=val("y1"),x2=val("x2"),y2=val("y2");
-      if([x1,y1,x2,y2].includes(null))return err();
-      D=Math.hypot(x2-x1,y2-y1);
-      f="√[(x₂−x₁)²+(y₂−y₁)²]";
-      break;
+  try{
+    switch(type.value){
+
+      case"2d":{
+        let x1=val("x1"),y1=val("y1"),x2=val("x2"),y2=val("y2");
+        if([x1,y1,x2,y2].includes(null)) throw "";
+        d=Math.hypot(x2-x1,y2-y1);
+        f="√[(x₂−x₁)²+(y₂−y₁)²]";
+        break;
+      }
+
+      case"3d":{
+        let x1=val("x1"),y1=val("y1"),z1=val("z1"),
+            x2=val("x2"),y2=val("y2"),z2=val("z2");
+        if([x1,y1,z1,x2,y2,z2].includes(null)) throw "";
+        d=Math.hypot(x2-x1,y2-y1,z2-z1);
+        f="√[(x₂−x₁)²+(y₂−y₁)²+(z₂−z₁)²]";
+        break;
+      }
+
+      case"manhattan":{
+        let x1=val("x1"),y1=val("y1"),x2=val("x2"),y2=val("y2");
+        if([x1,y1,x2,y2].includes(null)) throw "";
+        d=Math.abs(x2-x1)+Math.abs(y2-y1);
+        f="|x₂−x₁| + |y₂−y₁|";
+        break;
+      }
+
+      case"chebyshev":{
+        let x1=val("x1"),y1=val("y1"),x2=val("x2"),y2=val("y2");
+        if([x1,y1,x2,y2].includes(null)) throw "";
+        d=Math.max(Math.abs(x2-x1),Math.abs(y2-y1));
+        f="max(|x₂−x₁|, |y₂−y₁|)";
+        break;
+      }
+
+      case"gps":{
+        let lat1=val("lat1"),lon1=val("lon1"),
+            lat2=val("lat2"),lon2=val("lon2");
+        if([lat1,lon1,lat2,lon2].includes(null)) throw "";
+        const R=6371;
+        const dLat=rad(lat2-lat1);
+        const dLon=rad(lon2-lon1);
+        const a=Math.sin(dLat/2)**2+
+          Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLon/2)**2;
+        d=2*R*Math.asin(Math.sqrt(a));
+        f="Haversine Formula (Earth radius = 6371 km)";
+        break;
+      }
     }
-    case"3d":{
-      let x1=val("x1"),y1=val("y1"),z1=val("z1"),x2=val("x2"),y2=val("y2"),z2=val("z2");
-      if([x1,y1,z1,x2,y2,z2].includes(null))return err();
-      D=Math.sqrt((x2-x1)**2+(y2-y1)**2+(z2-z1)**2);
-      f="√[(x₂−x₁)²+(y₂−y₁)²+(z₂−z₁)²]";
-      break;
-    }
-    case"speed":{
-      let v=val("v"),t=val("t");
-      if(!v||!t)return err();
-      D=v*t;
-      f="Distance = Speed × Time";
-      break;
-    }
-    case"haversine":{
-      let R=6371;
-      let lat1=val("lat1"),lon1=val("lon1"),lat2=val("lat2"),lon2=val("lon2");
-      if([lat1,lon1,lat2,lon2].includes(null))return err();
-      let dLat=(lat2-lat1)*Math.PI/180;
-      let dLon=(lon2-lon1)*Math.PI/180;
-      let a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-      D=2*R*Math.asin(Math.sqrt(a));
-      f="Haversine Formula (Earth radius = 6371 km)";
-      break;
-    }
-    case"manhattan":{
-      let x1=val("x1"),y1=val("y1"),x2=val("x2"),y2=val("y2");
-      if([x1,y1,x2,y2].includes(null))return err();
-      D=Math.abs(x2-x1)+Math.abs(y2-y1);
-      f="|x₂−x₁| + |y₂−y₁|";
-      break;
-    }
-    case"chebyshev":{
-      let x1=val("x1"),y1=val("y1"),x2=val("x2"),y2=val("y2");
-      if([x1,y1,x2,y2].includes(null))return err();
-      D=Math.max(Math.abs(x2-x1),Math.abs(y2-y1));
-      f="max(|x₂−x₁|, |y₂−y₁|)";
-      break;
-    }
+
+    output.innerText=`Distance = ${d.toFixed(6)} ${unit.value}`;
+    formulaBox.innerHTML=`<b>Formula Used</b><br><br>${f}`;
+
+  }catch{
+    error.innerText="Please enter all required values correctly.";
   }
-
-  output.innerText=`Distance = ${D.toFixed(6)} ${unit.value}`;
-  formulaBox.innerHTML=`<b>Formula Used</b><br><br>${f}`;
-}
-
-function err(){
-  error.innerText="Please enter all required values.";
 }
 </script>
 
